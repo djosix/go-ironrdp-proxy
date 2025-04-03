@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+  <title>IronRDP</title>
+  <style>
+    body,
+    iron-remote-gui {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    iron-remote-gui {
+      position: fixed;
+    }
+  </style>
+  <script type="module" src="/iron-remote-gui.js"></script>
+</html>
+
+<body>
+  <dialog id="configDialog">
+    <h3>IronRDP</h3>
+    <table>
+      <tr>
+        <td><label for="serverInput">RDP Server</label></td>
+        <td>
+          <input type="text" id="serverInput" placeholder="HOST[:PORT]" />
+        </td>
+      </tr>
+      <tr>
+        <td><label for="usernameInput">Username</label></td>
+        <td><input type="text" id="usernameInput" placeholder="Username" /></td>
+      </tr>
+      <tr>
+        <td><label for="passwordInput">Password</label></td>
+        <td>
+          <input type="password" id="passwordInput" placeholder="Password" />
+        </td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><button id="connectButton" type="button">Connect</button></td>
+      </tr>
+    </table>
+  </dialog>
+
+  <iron-remote-gui id="ui" />
+
+  <script>
+    const ui = document.getElementById("ui");
+    let userInteraction = null;
+    const configDialog = document.getElementById("configDialog");
+    const serverInput = document.getElementById("serverInput");
+    const usernameInput = document.getElementById("usernameInput");
+    const passwordInput = document.getElementById("passwordInput");
+    const connectButton = document.getElementById("connectButton");
+
+    ui.addEventListener("ready", (e) => {
+      userInteraction = e.detail.irgUserInteraction;
+    });
+
+    async function connect() {
+      if (!serverInput.value || !usernameInput.value || !passwordInput.value) {
+        alert("Please fill in all fields");
+        return;
+      }
+      if (!userInteraction) {
+        alert("User interaction not ready");
+        return;
+      }
+
+      connectButton.disabled = true;
+
+      await userInteraction.connect(
+        usernameInput.value, // username
+        passwordInput.value, // password
+        serverInput.value.includes(":")
+          ? serverInput.value
+          : serverInput.value + ":3389", // destination
+        "/ws", // proxyAddress
+        "", // serverDomain
+        "", // authToken
+        { width: window.innerWidth, height: window.innerHeight }, // desktopSize
+        null, // preConnectionBlob
+        "", // kdc_proxy_url
+        true // use_display_control
+      );
+
+      userInteraction.setVisibility(true);
+
+      localStorage.setItem("server", serverInput.value);
+      localStorage.setItem("username", usernameInput.value);
+      localStorage.setItem("password", passwordInput.value);
+      configDialog.remove();
+
+      // Debounce resize events
+      let resizeTimeout = null;
+      window.addEventListener("resize", () => {
+        if (resizeTimeout) return;
+        resizeTimeout = setTimeout(() => {
+          userInteraction.resize(window.innerWidth, window.innerHeight);
+          resizeTimeout = null;
+        }, 1000);
+      });
+    }
+
+    {
+      serverInput.value = localStorage.getItem("server");
+      usernameInput.value = localStorage.getItem("username");
+      passwordInput.value = localStorage.getItem("password");
+
+      [serverInput, usernameInput, passwordInput].forEach((input) => {
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") connect();
+        });
+      });
+
+      connectButton.addEventListener("click", connect);
+
+      configDialog.showModal();
+    }
+  </script>
+</body>
